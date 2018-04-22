@@ -212,53 +212,62 @@ if __name__ == "__main__":
 
     # commandline interface
     while True:
-        command = get_input()
-        if command == "p":
-            if time_left is None: # if not None, already paused
-                if lockObject.acquire(True):
-                    time_left = end_time - datetime.now()
-                    print("Paused.\n$ ", end="")
-            else:
-                print("Error: current cycle is already paused.\n$ ", end="")
-        elif command == "c":
-            try:
-                lockObject.release()
-            except ThreadError:
-                print("Error: current cycle is not paused.\n$ ", end="")
-                continue
-            end_time = datetime.now() + time_left
-            time_left = None
-            print("Continuing the current pomodoro cycle.\nNew End Time: %s\n$ " % end_time.strftime("%H:%M"), end="")
-        elif command == "n":
-            nextState = True
-            thread_signal.put(None)
-        elif command == "s":
-            if state == States.Pomodori:
-                print("Pomodoro cycle", end="")
-            elif state == States.ShortBreak:
-                print("Short break", end="")
-            elif state == States.LongBreak:
-                print("Long break", end="")
+        try:
+            command = get_input()
+            if command == "p":
+                if time_left is None: # if not None, already paused
+                    if lockObject.acquire(True):
+                        time_left = end_time - datetime.now()
+                        print("Paused.\n$ ", end="")
+                else:
+                    print("Error: current cycle is already paused.\n$ ", end="")
+            elif command == "c":
+                try:
+                    lockObject.release()
+                except ThreadError:
+                    print("Error: current cycle is not paused.\n$ ", end="")
+                    continue
+                end_time = datetime.now() + time_left
+                time_left = None
+                print("Continuing the current pomodoro cycle.\nNew End Time: %s\n$ " % end_time.strftime("%H:%M"), end="")
+            elif command == "n":
+                nextState = True
+                thread_signal.put(None)
+            elif command == "s":
+                if state == States.Pomodori:
+                    print("Pomodoro cycle", end="")
+                elif state == States.ShortBreak:
+                    print("Short break", end="")
+                elif state == States.LongBreak:
+                    print("Long break", end="")
 
-            if time_left is None:
-                print(", running, %d minutes left\n$ " % round(
-                    (end_time - datetime.now()).total_seconds() / 60) , end="")
+                if time_left is None:
+                    print(", running, %d minutes left\n$ " % round(
+                        (end_time - datetime.now()).total_seconds() / 60) , end="")
+                else:
+                    print(", paused, %d minutes left\n$ " % round(
+                        time_left.total_seconds() / 60), end="")
+            elif command == "q":
+                try:
+                    lockObject.release()
+                except ThreadError:
+                    pass # Lock was not locked - exit anyway
+                thread_signal.put(None)
+                exit(0)
+            elif command == "t":
+                if terminal_bell == True:
+                    terminal_bell = False
+                    print("Terminal bell off")
+                elif terminal_bell == False:
+                    terminal_bell = True
+                    print("Terminal bell on")
             else:
-                print(", paused, %d minutes left\n$ " % round(
-                    time_left.total_seconds() / 60), end="")
-        elif command == "q":
+                print("Unknown command.\n$ ", end="")
+        except KeyboardInterrupt:
+            command = "q" # indicate the PomodoroThread to quit
             try:
                 lockObject.release()
             except ThreadError:
                 pass # Lock was not locked - exit anyway
             thread_signal.put(None)
             exit(0)
-        elif command == "t":
-            if terminal_bell == True:
-                terminal_bell = False
-                print("Terminal bell off")
-            elif terminal_bell == False:
-                terminal_bell = True
-                print("Terminal bell on")
-        else:
-            print("Unknown command.\n$ ", end="")
