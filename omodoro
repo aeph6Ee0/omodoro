@@ -15,9 +15,11 @@ from os.path import exists, join
 if version_info >= (3, 0):
     get_input = input
     from configparser import ConfigParser, NoOptionError
+    import queue
 else:
     get_input = raw_input
     from ConfigParser import ConfigParser, NoOptionError
+    import Queue as queue
 if platformname() == 'Windows':
     onWindows = True
 else:
@@ -70,6 +72,7 @@ time_left = None # time left after the pause
 state = States.Pomodori
 command = "" # input string
 lockObject = Lock()
+thread_signal = queue.Queue() # wake up the PomodoroThread when sleeping
 nextState = False # indicates user-triggered state change
 
 def changeState(newState, length):
@@ -156,8 +159,10 @@ class PomodoroThread(Thread):
                 print("Error - aborting.")
                 exit(1)
             lockObject.release()
-            sleep(30)
-        print("Shutdown finished.")
+            try:
+                thread_signal.get(block=True, timeout=30)
+            except queue.Empty:
+                pass
 
 
 if __name__ == "__main__":
@@ -226,7 +231,7 @@ if __name__ == "__main__":
             print("Continuing the current pomodoro cycle.\nNew End Time: %s\n$ " % end_time.strftime("%H:%M"), end="")
         elif command == "n":
             nextState = True
-            print("Skipping to next pomodori/break, please wait some seconds.", end="")
+            thread_signal.put(None)
         elif command == "s":
             if state == States.Pomodori:
                 print("Pomodoro cycle", end="")
@@ -246,7 +251,7 @@ if __name__ == "__main__":
                 lockObject.release()
             except ThreadError:
                 pass # Lock was not locked - exit anyway
-            print("omodoro is shutting down, please wait some seconds.")
+            thread_signal.put(None)
             exit(0)
         elif command == "t":
             if terminal_bell == True:
